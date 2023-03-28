@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-27 17:17:34
+ * @LastEditTime: 2023-03-28 10:55:44
  * @Description: 
 -->
 <template></template>
@@ -112,7 +112,7 @@
     //纹理贴图加载器TextureLoader
 const texLoader = new THREE.TextureLoader();
 // .load()方法加载图像，返回一个纹理对象Texture
-const texture = texLoader.load('../../model/77/Texture/衣服.png');
+const texture = texLoader.load('../../model/house.jpg');
 const material = new THREE.MeshLambertMaterial({
     // 设置纹理贴图：Texture对象作为材质map属性的属性值
     // color:0xff6600,
@@ -120,7 +120,7 @@ const material = new THREE.MeshLambertMaterial({
     transparent:true,
     opacity:1,
     side:THREE.DoubleSide,
-    wireframe:true,//线条模式渲染mesh对应的三角形数据
+    // wireframe:true,//线条模式渲染mesh对应的三角形数据
 });                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
     // const material = new THREE.MeshPhongMaterial({
     //   color:0xff6600
