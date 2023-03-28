@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 11:31:14
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-27 11:37:50
+ * @LastEditTime: 2023-03-28 22:04:03
  * @Description: 
  */
 import { defineConfig } from 'vite'
@@ -18,4 +18,8 @@ export default defineConfig({
     }
   },
   plugins: [vue()],
+  server:{
+    port:5173,
+    host:"0.0.0.0"
+  }
 })
