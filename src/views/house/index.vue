@@ -2,11 +2,11 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-30 11:50:52
+ * @LastEditTime: 2023-03-30 15:40:16
  * @Description: 
 -->
 <template>
-  <div class="house" id="house">
+  <div class="canvas" id="house">
     <div class="controls">
       <span class="controls_btn" @click="checkScene('house')">主卧</span>
       <span class="controls_btn" @click="checkScene('street')">街道</span>
@@ -181,7 +181,6 @@
 
 </script>
 <style lang="scss" scoped>
-.house{width: 100vw; height: 100vh; position: relative;}
 .controls{
   display: flex;
   justify-content: space-around;

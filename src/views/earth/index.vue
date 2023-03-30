@@ -2,15 +2,17 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-30 12:25:48
+ * @LastEditTime: 2023-03-30 15:39:56
  * @Description: 
 -->
 <template>
-	<div class="earth" id="earth"></div>
+	<div class="canvas" id="earth"></div>
 </template>
 <script setup>
 	import { reactive, onMounted } from 'vue'
 	import  * as THREE  from 'three';
+
+	import * as TWEEN from '@tweenjs/tween.js'
   // 引入轨道控制器扩展库OrbitControls.js 配置addons/等价于examples/jsm/。
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -21,9 +23,9 @@
   import Stats from 'three/addons/libs/stats.module.js';
   import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-	var fovMax = 75,
-  fovMin = 5,
-  fovTmp = 0;
+	const stats = new Stats();
+	document.body.appendChild(stats.domElement);
+
 
 	let scene = reactive({}) // 场景
   let camera = reactive({}) // 相机
@@ -42,9 +44,10 @@
 	let cloudMaterial = reactive({}) // 云层材质
 	let earthGroup = reactive({}) // 模型组
 
+	let timer = reactive(null)
 
 	onMounted(()=>{
-		console.log(FBXLoader)
+		console.log(TWEEN)
     console.log(THREE);
 
 		initScene() // 创建3D场景
@@ -56,25 +59,16 @@
     initMesh() // 创建网格模型
 		initCasque()
     initControls() // 添加控制器
-
-		intoAnimation()
+		intoAnimation() // 添加进场动画
 	})
 
 	const initScene = () =>{
 		scene = new THREE.Scene()
 		scene.background = new THREE.Color(0x020924); // 设置场景背景颜色
-
-
-
-
-
-
-
 	}
 	const initCamera = ()=>{
 		camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 ); 
-		// camera.position.z = 5
-		camera.position.set(0, 0, 20); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
+		camera.position.set(0, 0, 101); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
     camera.lookAt(0, 0, 0); //坐标原点
     scene.add(camera); // 将相机添加到场景中
 	}
@@ -82,14 +76,13 @@
 	const initRenderer = ()=>{
     renderer = new THREE.WebGLRenderer( { antialias: true } ); // 创建一个WebGL渲染对象
     renderer.setSize( window.innerWidth, window.innerHeight ); // 设置渲染区域尺寸
-		// setTimeout(()=>{
-		// 	renderer.render( scene, camera ); // 执行渲染操作
-		// },300)
-    renderer.setAnimationLoop( animation ); // 执行动画循环
+
+    // renderer.setAnimationLoop( animation ); // 执行动画循环 帧率不会锁60
+		renders()
     document.getElementById("earth").appendChild( renderer.domElement );
   }
 
-	const initBackground = ()=>{
+	const initBackground = ()=>{ // 星空背景
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
 		let texture = texLoader.load( '../../model/earth/star.png');
 
@@ -147,7 +140,7 @@
 		scene.add(earthGroup)
   }
 
-	const initCasque = ()=>{
+	const initCasque = ()=>{ // 彩蛋，头盔模型
 		new RGBELoader()
 					.setPath( '../../textures/equirectangular/' )
 					.load( 'royal_esplanade_1k.hdr', function ( texture ) {
@@ -157,7 +150,7 @@
 						const loader = new GLTFLoader().setPath( '../../model/DamagedHelmet/glTF/' );
 						loader.load( 'DamagedHelmet.gltf', function ( gltf ) {
 							scene.add( gltf.scene );
-							renderer.render( scene, camera );
+							renders()
 						});
 					});
 	}
@@ -166,30 +159,33 @@
   const initControls = ()=>{
       controls = new OrbitControls(camera, renderer.domElement);
       controls.addEventListener('change', function (e) { //监听事件
-        renderer.render(scene, camera); //执行渲染操作
+        renders()
       });
 			controls.enableDamping = true 
-			controls.minDistance = 1;
-			controls.maxDistance = 80;
+			controls.minDistance = 0.1;
+			controls.maxDistance = 100;
       // controls.enableZoom = false
   }
+	const renders = ()=> { // 执行渲染操作
+		cancelAnimationFrame(timer)
+		TWEEN.update()
+		stats.update();
+		renderer.render( scene, camera );
+		timer = requestAnimationFrame(animation) // 采用循环动画帧率的方案，帧率锁60，但是性能消耗小
+	}
 
   const animation = ( time )=> {
-      // mesh.rotation.x = time / 2000;
       earthGroup.rotation.y -= 0.001;
-			colud.rotation.y -= 0.0001
-      renderer.render( scene, camera ); // 执行渲染操作
+			colud.rotation.y += 0.0001
+      renders()
   }
 
 	const intoAnimation = ()=>{
-			console.log(camera.fov);
-			requestAnimationFrame(()=>{camera.fov+=1})
+		let tween = new TWEEN.Tween(camera.position).to({x: 0, y: 0, z:20}, 4000)
+      	tween.start()
 	}
 
 
 
 
 </script>
-<style lang="scss" scoped>
-.earth{width: 100vw; height: 100vh; position: relative;}
-</style>
