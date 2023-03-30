@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-29 14:14:42
+ * @LastEditTime: 2023-03-30 11:50:52
  * @Description: 
 -->
 <template>
@@ -156,6 +156,8 @@
       controls.addEventListener('change', function (e) { //监听事件
         renderer.render(scene, camera); //执行渲染操作
       });
+      controls.minDistance = 1;
+			controls.maxDistance = 3;
       // controls.enableZoom = false
   }
 

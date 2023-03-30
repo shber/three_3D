@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-29 18:33:10
+ * @LastEditTime: 2023-03-30 12:25:48
  * @Description: 
 -->
 <template>
@@ -11,8 +11,12 @@
 <script setup>
 	import { reactive, onMounted } from 'vue'
 	import  * as THREE  from 'three';
-  // 引入轨道控制器扩展库OrbitControls.js
+  // 引入轨道控制器扩展库OrbitControls.js 配置addons/等价于examples/jsm/。
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+	import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+	import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+	import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
   //引入性能监视器stats.js
   import Stats from 'three/addons/libs/stats.module.js';
   import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
@@ -26,16 +30,21 @@
   let light = reactive({}) // 灯光
   let renderer = reactive({}) // 渲染
   let mesh = reactive({}) // 网格模型
-  let model = reactive({}) // 模型
-  let material = reactive([]) //材质包
+  let model = reactive({}) // 地球模型
+  let material = reactive([]) //地球材质包
   let controls = reactive({}) // 控制器
   let gui = reactive({}) // 全局控制
-	let box = reactive({})
-	let box1 = reactive({})
 	let startGeometry = reactive({})
 	let starsMaterial = reactive({})
 
+	let colud = reactive({})
+	let cloudGeometry = reactive({}) // 云层模型
+	let cloudMaterial = reactive({}) // 云层材质
+	let earthGroup = reactive({}) // 模型组
+
+
 	onMounted(()=>{
+		console.log(FBXLoader)
     console.log(THREE);
 
 		initScene() // 创建3D场景
@@ -45,15 +54,22 @@
     initModel() // 创建模型，例如长方体，球体等
 		initBackground()
     initMesh() // 创建网格模型
+		initCasque()
     initControls() // 添加控制器
 
-		// window.addEventListener("wheel", zoom);
-
+		intoAnimation()
 	})
 
 	const initScene = () =>{
 		scene = new THREE.Scene()
 		scene.background = new THREE.Color(0x020924); // 设置场景背景颜色
+
+
+
+
+
+
+
 	}
 	const initCamera = ()=>{
 		camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 ); 
@@ -66,21 +82,21 @@
 	const initRenderer = ()=>{
     renderer = new THREE.WebGLRenderer( { antialias: true } ); // 创建一个WebGL渲染对象
     renderer.setSize( window.innerWidth, window.innerHeight ); // 设置渲染区域尺寸
-		setTimeout(()=>{
-			renderer.render( scene, camera ); // 执行渲染操作
-		},300)
-    // renderer.setAnimationLoop( animation ); // 执行动画循环
+		// setTimeout(()=>{
+		// 	renderer.render( scene, camera ); // 执行渲染操作
+		// },300)
+    renderer.setAnimationLoop( animation ); // 执行动画循环
     document.getElementById("earth").appendChild( renderer.domElement );
   }
 
 	const initBackground = ()=>{
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
-		let texture = texLoader.load( '../../model/round.png');
+		let texture = texLoader.load( '../../model/earth/star.png');
 
 		const positions = [];
 		const colors = [];
 		startGeometry = new THREE.BufferGeometry();
-		for (var i = 0; i < 10000; i ++) {
+		for (var i = 0; i < 20000; i ++) {
 			var vertex = new THREE.Vector3();
 			vertex.x = Math.random() * 2 - 1;
 			vertex.y = Math.random() * 2 - 1;
@@ -92,7 +108,6 @@
 		}
 		startGeometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
 		startGeometry.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
-
 
 		starsMaterial = new THREE.PointsMaterial({
 			map: texture,
@@ -111,43 +126,66 @@
 	}
 
 	const initModel = ()=>{
-		box = new THREE.BoxGeometry(1, 1, 1);
-		box1 = new THREE.MeshBasicMaterial({color: 0xff6600})
-
-    model = new THREE.SphereGeometry(10, 100, 100);		
+    model = new THREE.SphereGeometry(10, 100, 100); // 地球模型
+		cloudGeometry = new THREE.SphereGeometry(10.1, 100, 100); // 云模型			
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
-		let texture = texLoader.load( '../../model/earth2.jpg');
-		material = new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}); 
+		let texture = texLoader.load( '../../model/earth/earth2.jpg'); // 地球贴图
+		let cloidTexture = texLoader.load( '../../model/earth/cloud2.png'); // 云贴图
+		material = new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide});
+		cloudMaterial = new THREE.MeshBasicMaterial({map: cloidTexture, opacity: 1, transparent:true}); 
   }
 
 	const initMesh = ()=> {
-    mesh = new THREE.Mesh( model, material ); //网格模型对象Mesh, 把几何体模型与材质传过来
-    scene.add( mesh ); // 往3D场景里添加模型
+		earthGroup = new THREE.Group(); 
 
-		let boxContent = new THREE.Mesh( box, box1 ); //网格模型对象Mesh, 把几何体模型与材质传过来
-		mesh.position.set(0, 0, 0)
-    scene.add( boxContent ); // 往3D场景里添加模型
+    mesh = new THREE.Mesh( model, material ); //网格模型对象Mesh, 把几何体模型与材质传过来
+    earthGroup.add( mesh ); // 往3D场景里添加模型
+
+		colud = new THREE.Mesh( cloudGeometry, cloudMaterial ); //网格模型对象Mesh, 把几何体模型与材质传过来
+    scene.add( colud ); // 往3D场景里添加模型
+
+		scene.add(earthGroup)
   }
+
+	const initCasque = ()=>{
+		new RGBELoader()
+					.setPath( '../../textures/equirectangular/' )
+					.load( 'royal_esplanade_1k.hdr', function ( texture ) {
+						texture.mapping = THREE.EquirectangularReflectionMapping;
+						scene.environment = texture;
+
+						const loader = new GLTFLoader().setPath( '../../model/DamagedHelmet/glTF/' );
+						loader.load( 'DamagedHelmet.gltf', function ( gltf ) {
+							scene.add( gltf.scene );
+							renderer.render( scene, camera );
+						});
+					});
+	}
 
 
   const initControls = ()=>{
       controls = new OrbitControls(camera, renderer.domElement);
       controls.addEventListener('change', function (e) { //监听事件
-				// console.log(e, camera.fov);
         renderer.render(scene, camera); //执行渲染操作
       });
 			controls.enableDamping = true 
+			controls.minDistance = 1;
+			controls.maxDistance = 80;
       // controls.enableZoom = false
   }
-	const zoom = (event)=> {
-		// event.preventDefault();
-		// return console.log(event);
-		fovTmp = camera.fov + (event.deltaY * 0.05);
-		if (fovTmp >= fovMin && fovTmp <= fovMax) {
-			camera.fov = fovTmp;
-			camera.updateProjectionMatrix();
-		}
+
+  const animation = ( time )=> {
+      // mesh.rotation.x = time / 2000;
+      earthGroup.rotation.y -= 0.001;
+			colud.rotation.y -= 0.0001
+      renderer.render( scene, camera ); // 执行渲染操作
+  }
+
+	const intoAnimation = ()=>{
+			console.log(camera.fov);
+			requestAnimationFrame(()=>{camera.fov+=1})
 	}
+
 
 
 
