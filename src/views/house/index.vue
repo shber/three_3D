@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-30 15:40:16
+ * @LastEditTime: 2023-03-31 14:42:41
  * @Description: 
 -->
 <template>
@@ -199,6 +199,6 @@ span.controls_btn{
     cursor: pointer;
   }
 .top_controls{
-  position: absolute; top: 20px; right: 20px; z-index: 8;
+  position: absolute; top: 20px; right: 20px; z-index: 8; color: #ffffff;
 }
 </style>
