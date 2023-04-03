@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-03-31 16:56:37
+ * @LastEditTime: 2023-04-03 18:43:50
  * @Description: 
 -->
 <template>
@@ -27,52 +27,43 @@
 	const stats = new Stats();
 	document.body.appendChild(stats.domElement);
 
-
+  let gui = reactive({}) // 全局控制
 	let scene = reactive({}) // 场景
   let camera = reactive({}) // 相机
   let light = reactive({}) // 灯光
   let renderer = reactive({}) // 渲染
-  let mesh = reactive({}) // 网格模型
-  let model = reactive({}) // 地球模型
-  let material = reactive([]) //地球材质包
   let controls = reactive({}) // 控制器
-  let gui = reactive({}) // 全局控制
-	let startGeometry = reactive({})
-	let starsMaterial = reactive({})
 
-	let colud = reactive({})
-	let cloudGeometry = reactive({}) // 云层模型
-	let cloudMaterial = reactive({}) // 云层材质
-	let earthGroup = reactive({}) // 模型组
-	let chinaLine = reactive({})
-	let province =reactive({})
-	let map = reactive({})
+	let earthGroup = reactive({}) // 地球模型组
+	let earth = reactive({}) // 地球
+	let colud = reactive({}) // 云层
+	let map = reactive() // 中国地图
+	let pointwave = reactive({}) // 光点涟漪
+	let ringGroup = reactive({}) // 星环
+	let flyline =reactive({}) // 飞线
 
-	let ringGroup = reactive({})
-	let starRing = reactive({})
-	let starRing1 = reactive({})
-	let starRing2 = reactive({})
 
 
 
 	let timer = reactive()
 
 	onMounted(()=>{
-		console.log(chinaMap)
     console.log(THREE);
 
 		initScene() // 创建3D场景
     initCamera() // 创建相机
     initLight() // 创建光照效果
-		initRing()
-
-		// 	initChinaMap(chinaMap)
+		initRing() // 星环
+		initFlyline() // 飞线
+		// initPointwave()
+		initChinaMap(chinaMap) // 地图轮廓
 
     initRenderer() // 开始合成
     initModel() // 创建模型，例如长方体，球体等
+		// initBeam()
 		initBackground()
     initMesh() // 创建网格模型
-		initCasque()
+		// initCasque()
     initControls() // 添加控制器
 		intoAnimation() // 添加进场动画
 	})
@@ -107,41 +98,150 @@
     var ambient = new THREE.AmbientLight(0x002bff, 0.8);
     scene.add(ambient);
 	}
-	const lglt2xyz =(lng, lat, radius)=> {
-		const theta = (90 + lng) * (Math.PI / 180)
-		const phi = (90 - lat) * (Math.PI / 180)
-		return (new THREE.Vector3()).setFromSpherical(new THREE.Spherical(radius, phi, theta))
-	}
+
 
 	const initChinaMap = (chinaJson )=>{
-		
+		const lglt2xyz =(lng, lat, radius)=> {
+			const theta = (90 + lng) * (Math.PI / 180)
+			const phi = (90 - lat) * (Math.PI / 180)
+			return (new THREE.Vector3()).setFromSpherical(new THREE.Spherical(radius, phi, theta))
+		}
+
+		map = new THREE.Group()
+		// 遍历省份构建模型
+		chinaJson.features.forEach( elem => {
+			// 新建一个省份容器：用来存放省份对应的模型和轮廓线
+			let province = new THREE.Group();
+			const coordinates = elem.geometry.coordinates;
+			coordinates.forEach( multiPolygon => {
+				multiPolygon.forEach( polygon => {
+					const lineMaterial = new THREE.LineBasicMaterial( { color: 0XF19553 } ); //0x3BFA9E
+					const positions = [];
+					const linGeometry = new THREE.BufferGeometry();
+					for (let i = 0; i < polygon.length; i ++) {
+						var pos = lglt2xyz( polygon[i][0], polygon[i][1] );
+						positions.push( pos.x, pos.y, pos.z );
+					}
+					linGeometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
+					const line = new THREE.Line( linGeometry, lineMaterial );
+					province.add( line );
+				} );
+			} );
+			map.add( province );
+		} );
+		map.scale.set(10,10,10)
+
+
 	}
+
+
+	const initPointwave = (WaveMeshArr)=>{
+  // 所有波动光圈都有自己的透明度和大小状态
+  // 一个波动光圈透明度变化过程是：0~1~0反复循环
+			// WaveMeshArr.forEach(function (mesh) {
+			// 	mesh._s += 0.007;
+			// 	mesh.scale.set(
+			// 		mesh.size * mesh._s,
+			// 		mesh.size * mesh._s,
+			// 		mesh.size * mesh._s
+			// 	);
+			// 	if (mesh._s <= 1.5) {
+			// 		mesh.material.opacity = (mesh._s - 1) * 2; //2等于1/(1.5-1.0)，保证透明度在0~1之间变化
+			// 	} else if (mesh._s > 1.5 && mesh._s <= 2) {
+			// 		mesh.material.opacity = 1 - (mesh._s - 1.5) * 2; //2等于1/(2.0-1.5) mesh缩放2倍对应0 缩放1.5被对应1
+			// 	} else {
+			// 		mesh._s = 1.0;
+			// 	}
+			// })
+			
+		var point = new THREE.PlaneBufferGeometry(1,1)
+		const texLoader = new THREE.TextureLoader(); 
+		let pointTexture = texLoader.load('../../model/earth/point.png');
+		var material = new THREE.MeshBasicMaterial({
+				map: pointTexture,
+				color:0xffc300,
+				map: pointTexture,
+				transparent: true, //使用背景透明的png贴图，注意开启透明计算
+				depthWrite:false,//禁止写入深度缓冲区数据
+		});
+
+		pointwave = new THREE.Mesh( point, material );
+		pointwave.scale.set(12, 12, 12)
+		pointwave.position.set(3, 0, 0)
+		// pointwave.rotation.set(20, 20, 20)
+	
+	}
+	const initFlyline = ()=>{
+/**
+         * 创建线条模型
+         */
+				 var geometry = new THREE.BufferGeometry(); //创建一个缓冲类型几何体
+        // 三维样条曲线
+        var curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(10, 0, -10),
+            new THREE.Vector3(0, 8, 0),
+            // new THREE.Vector3(0, 80, 90),
+            new THREE.Vector3(-10, 0, 10),
+        ]);
+        //曲线上等间距返回多个顶点坐标
+        var points = curve.getSpacedPoints(100); //分段数100，返回101个顶点
+        // setFromPoints方法从points中提取数据赋值给attributes.position
+        geometry.setFromPoints(points);
+        var material = new THREE.LineBasicMaterial({
+            color: 0x006666, //轨迹颜色
+        });
+        //线条模型对象
+        var line = new THREE.Line(geometry, material);
+        scene.add(line);
+
+        var index = 20; //取点索引位置
+        var num = 10; //从曲线上获取点数量
+        var points2 = points.slice(index, index + num); //从曲线上获取一段
+        var geometry2 = new THREE.BufferGeometry();
+        geometry2.setFromPoints(points2);
+
+
+        // 批量计算所有顶点颜色数据
+        var posNum = points2.length - 2; //分界点黄色，两端和轨迹线一个颜色青色
+        var colorArr = [];
+        for (var i = 0; i < points2.length; i++) {
+            var color1 = new THREE.Color(0x006666); //轨迹线颜色 青色
+            var color2 = new THREE.Color(0xffff00); //黄色
+            var color = null;
+            // 飞线段里面颜色设置为黄色，两侧设置为青色，也就是说中间某个位置向两侧颜色渐变
+            if (i < posNum) {
+                color = color1.lerp(color2, i / posNum)
+            } else {
+                color = color2.lerp(color1, (i - posNum) / (points2.length - posNum))
+            }
+            colorArr.push(color.r, color.g, color.b);
+        }
+        // 设置几何体顶点颜色数据
+        geometry2.attributes.color = new THREE.BufferAttribute(new Float32Array(colorArr), 3);
+
+
+        var material2 = new THREE.LineBasicMaterial({
+            // color: 0xffff00, //轨迹颜色
+            vertexColors: THREE.VertexColors, //使用顶点颜色，不用设置color
+             linewidth: 3.0, // 设置线宽
+        });
+        //线条模型对象
+        var line2 = new THREE.Line(geometry2, material2);
+        scene.add(line2);
+
+		// scene.add(addLines(0,100))
+
+	}
+
 	const initRing = ()=>{
 		ringGroup = new THREE.Group()
-		// const geometry = new THREE.RingGeometry( 12, 12.1, 100 );
-		// const material = new THREE.MeshBasicMaterial( { color: 0xff6600, side: THREE.DoubleSide,  opacity: 0.5, transparent:true } );
-		// starRing = new THREE.Mesh( geometry, material );
 
-		// const geometry1 = new THREE.RingGeometry( 12.1, 12.2, 100 );
-		// const material1 = new THREE.MeshBasicMaterial( { color: 0xffff00, side: THREE.DoubleSide,  opacity: 0.5, transparent:true } );
-		// starRing1 = new THREE.Mesh( geometry1, material1 );
-
-		// const geometry2 = new THREE.RingGeometry( 12.3, 12.3, 100 );
-		// const material2 = new THREE.MeshBasicMaterial( { color: 0xff6600, side: THREE.DoubleSide,  opacity: 0.5, transparent:true } );
-		// starRing2 = new THREE.Mesh( geometry2, material2 );
-
-		// ringGroup.add(starRing)
-		// ringGroup.add(starRing1)
-		// ringGroup.add(starRing2)
-
-		// ringGroup.rotation.x = 1
-		// ringGroup.rotation.y = 2
-		// ringGroup.rotation.z = 3
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
-		texLoader.load( '../../model/earth/ring2.png', function ( texture ) {
-			const geometry = new THREE.RingGeometry( 12, 15, 100 );
-			// var geometry = new THREE.PlaneGeometry( 80, 80 );
+		texLoader.load( '../../model/earth/ring.png', function ( texture ) {
+			// const geometry = new THREE.RingGeometry( 12, 15, 100 );
+			var geometry = new THREE.PlaneGeometry( 32.5, 32.5 );
 			var material = new THREE.MeshLambertMaterial( {
+				color: 0xffffff,
 				map: texture, 
 				transparent: true,
 				opacity: 0.5,
@@ -150,25 +250,22 @@
 			} );
 			var mesh = new THREE.Mesh( geometry, material );
 			ringGroup.add( mesh );
-		} );
+		});
 
-		texLoader.load( '../../model/earth/moon1.png', function ( texture ) {
-			var p1 = new THREE.Vector3( - 12, 0, 0 );
-			var p2 = new THREE.Vector3( 12, 0, 0 );
-			const points = [ p1,p2];
-			const geometry = new THREE.BufferGeometry().setFromPoints( points );
+		texLoader.load( '../../model/earth/moon.png', function ( texture ) {
+			var moon = new THREE.Vector3( 12.01, 0, 0 );
+			const geometry = new THREE.BufferGeometry().setFromPoints( [moon] );
 			var material = new THREE.PointsMaterial( {
 				map: texture,
 				transparent: true,
 				side: THREE.DoubleSide, 
-				size: 1, 
+				size: 2, 
 				depthWrite: false
 			} );
 			var earthPoints = new THREE.Points( geometry, material );
 			ringGroup.add( earthPoints );
 		} );
-		ringGroup.rotation.set( 1.9, 0.5, 1.5 );
-
+		ringGroup.rotation.set( 1.7, 0.2, 1.5 );
 	}
 
 
@@ -187,7 +284,7 @@
 
 		const positions = [];
 		const colors = [];
-		startGeometry = new THREE.BufferGeometry();
+		let startGeometry = new THREE.BufferGeometry();
 		for (var i = 0; i < 20000; i ++) {
 			var vertex = new THREE.Vector3();
 			vertex.x = Math.random() * 2 - 1;
@@ -201,7 +298,7 @@
 		startGeometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
 		startGeometry.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
 
-		starsMaterial = new THREE.PointsMaterial({
+		let starsMaterial = new THREE.PointsMaterial({
 			map: texture,
 			size: 1,
 			transparent: true,
@@ -218,26 +315,28 @@
 	}
 
 	const initModel = ()=>{
-    model = new THREE.SphereGeometry(10, 100, 100); // 地球模型
-		cloudGeometry = new THREE.SphereGeometry(10.1, 100, 100); // 云模型		
+    let earthGeometry = new THREE.SphereGeometry(10, 100, 100); // 地球模型
+		let cloudGeometry = new THREE.SphereGeometry(10.1, 100, 100); // 云模型		
 
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
 		let texture = texLoader.load( '../../model/earth/earth3.png'); // 地球贴图
-		let cloidTexture = texLoader.load( '../../model/earth/cloud2.png'); // 云贴图
-		material = new THREE.MeshLambertMaterial({map: texture, side:THREE.DoubleSide}); // 切换漫反射材质
-		cloudMaterial = new THREE.MeshBasicMaterial({map: cloidTexture, opacity: 1, transparent:true}); 
+		let cloidTexture = texLoader.load( '../../model/earth/cloud1.png'); // 云贴图
+		let earthMaterial = new THREE.MeshLambertMaterial({map: texture, side:THREE.DoubleSide}); // 切换漫反射材质
+		let cloudMaterial = new THREE.MeshBasicMaterial({map: cloidTexture, opacity: 0.3, transparent:true}); 
+
+		colud = new THREE.Mesh( cloudGeometry, cloudMaterial );
+    earth = new THREE.Mesh( earthGeometry, earthMaterial ); //网格模型对象Mesh, 把几何体模型与材质传过来
   }
 
 	const initMesh = ()=> {
 		earthGroup = new THREE.Group(); 
 
-    mesh = new THREE.Mesh( model, material ); //网格模型对象Mesh, 把几何体模型与材质传过来
-    earthGroup.add( mesh ); // 往3D场景里添加模型
+    earthGroup.add( earth ); // 往3D场景里添加地球模型
+    scene.add( colud ); // 云层
+		earthGroup.add(map); // 地图
+		earthGroup.add(pointwave) // 光点
+		scene.add( ringGroup ); // 星环
 
-		earthGroup.add( ringGroup );
-
-		colud = new THREE.Mesh( cloudGeometry, cloudMaterial ); //网格模型对象Mesh, 把几何体模型与材质传过来
-    scene.add( colud ); // 往3D场景里添加模型
 		earthGroup.rotation.y = -3.4
 		earthGroup.rotation.x = 0.5
 		scene.add(earthGroup)
@@ -277,9 +376,9 @@
 		timer = requestAnimationFrame(animation) // 采用循环动画帧率的方案，帧率锁60，但是性能消耗小
 	}
 
-  const animation = ( time )=> {
+  const animation = ( )=> {
       earthGroup.rotation.y -= 0.0001;
-			ringGroup.rotation.z += 0.001;
+			ringGroup.rotation.z += 0.01;
 			colud.rotation.y += 0.0001
       renders()
   }
