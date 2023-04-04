@@ -2,16 +2,16 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-03 18:43:50
+ * @LastEditTime: 2023-04-04 17:32:48
  * @Description: 
 -->
 <template>
 	<div class="canvas" id="earth"></div>
 </template>
 <script setup>
-	import { reactive, onMounted } from 'vue'
+	import { reactive, ref , onMounted } from 'vue'
+	// import { addPoints } from '@/utils/index.js'
 	import  * as THREE  from 'three';
-
 	import * as TWEEN from '@tweenjs/tween.js'
   // 引入轨道控制器扩展库OrbitControls.js 配置addons/等价于examples/jsm/。
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -40,8 +40,33 @@
 	let map = reactive() // 中国地图
 	let pointwave = reactive({}) // 光点涟漪
 	let ringGroup = reactive({}) // 星环
-	let flyline =reactive({}) // 飞线
+	let flyline = reactive({}) // 飞线
+	let groupFlyline = reactive({})
 
+	var groupDots = reactive() 
+	var groupLines = reactive()
+	var groupAnimDots = reactive();
+	var animateDots = reactive([]); // 小球运动点轨迹
+
+
+	// let commonUniforms = reactive({
+	// 	time: { value: 0 },
+	// 	number: { value: 1 },
+	// 	speed: { value: 0.5 },
+	// 	length: { value: 0.6 }, // 飞线长度
+	// 	size: { value: 2.5 } // 飞线宽度
+	// });
+	// // 配置参数
+	// var params = {
+	// 	globeRadius: 10, // 地球半径
+	// 	pointsLength: [
+	// 		[116.405285, 39.904989],
+	// 		[121.472644, 31.231706],
+	// 		[113.280637, 23.125178],
+	// 		[104.065735, 30.659462]
+	// 	], // 点数
+	// }
+	// var _PI2 = Math.PI * 2; // 弧度的取值为0-2π
 
 
 
@@ -49,7 +74,9 @@
 
 	onMounted(()=>{
     console.log(THREE);
-
+		groupFlyline = new THREE.Group(); // flyline
+		groupDots = new THREE.Group();
+    groupAnimDots = new THREE.Group();
 		initScene() // 创建3D场景
     initCamera() // 创建相机
     initLight() // 创建光照效果
@@ -63,7 +90,7 @@
 		// initBeam()
 		initBackground()
     initMesh() // 创建网格模型
-		// initCasque()
+		initCasque()
     initControls() // 添加控制器
 		intoAnimation() // 添加进场动画
 	})
@@ -134,6 +161,122 @@
 
 	}
 
+	const  linetimer = ref(0);
+	const initFlyline = ()=>{
+// 地球飞线和点
+// 配置参数
+var params = {
+    pointsLength: 50, // 点数
+    globeRadius: 10 // 地球半径
+}
+
+const PI2 = Math.PI * 2; // 弧度的取值为0-2π
+
+// 预制件
+var Prefab = {
+    Sphere: (function() {
+        var instance;
+        return function(clone = true) {
+            if (!instance) {
+                instance = new createSphere();
+            }
+            if (clone) return instance.clone();
+            else return instance;
+        }
+    })()
+}
+// 地球飞线和点
+
+    // 球面随机点
+    for (let i = 0; i < params.pointsLength; i++) {
+        addPoints(groupDots, params.globeRadius);
+    }
+
+    // 曲线
+    groupDots.children.forEach(function(elem) {
+        // 从第一个点到其它点
+        if (elem != groupDots.children[0]) {
+            var line = addLines(groupDots.children[0].position, elem.position);
+            animateDots.push(line.curve.getPoints(100));
+        }
+    });
+
+    // 小球动画
+    for (let i = 0; i < animateDots.length; i++) {
+        var mesh = new Prefab.Sphere();
+        mesh.material = new THREE.MeshBasicMaterial({
+            color: 0xffff00
+        });
+        mesh.material.needsUpdate = true;
+        groupAnimDots.add(mesh);
+    }
+
+
+// 3d球面取点
+function getEarthPos(radius, a, b) {
+    var x = radius * Math.sin(a) * Math.cos(b);
+    var y = radius * Math.sin(a) * Math.sin(b);
+    var z = radius * Math.cos(a);
+    return {
+        x, y, z
+    };
+}
+
+
+// 添加随机点
+function addPoints(group, radius) {
+    var mesh = new Prefab.Sphere();
+    var pos = getEarthPos(radius, PI2 * Math.random(), PI2 * Math.random());
+    mesh.position.set(pos.x, pos.y, pos.z);
+    group.add(mesh);
+}
+
+function addLines(v0, v3) {
+	groupLines = new THREE.Group();
+    var angle = v0.angleTo(v3);
+
+    var vtop = v0.clone().add(v3);
+    vtop = vtop.normalize().multiplyScalar(params.globeRadius);
+
+    var n;
+
+    if (angle <= 1) {
+        n = params.globeRadius / 5 * angle;
+    } else if (angle > 1 && angle < 2) {
+        n = params.globeRadius / 5 * Math.pow(angle, 2);
+    } else {
+        n = params.globeRadius / 5 * Math.pow(angle, 1.5);
+    }
+
+    var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
+    var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
+
+
+    // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
+    var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
+    var geometry = new THREE.BufferGeometry();
+    geometry.vertices = curve.getPoints(50);
+    var material = new THREE.LineBasicMaterial({
+        color: 0xff0000
+    });
+    var lineMesh = new THREE.Line(geometry, material)
+    groupLines.add(lineMesh);
+
+    return {
+        curve: curve,
+        lineMesh: lineMesh
+    };
+}
+
+function createSphere() {
+    var geometry = new THREE.SphereBufferGeometry(0.07);
+    var material = new THREE.MeshBasicMaterial({
+        color: 0x00ffff
+    });
+    var mesh = new THREE.Mesh(geometry, material);
+    return mesh;
+}
+	}
 
 	const initPointwave = (WaveMeshArr)=>{
   // 所有波动光圈都有自己的透明度和大小状态
@@ -171,73 +314,127 @@
 		// pointwave.rotation.set(20, 20, 20)
 	
 	}
-	const initFlyline = ()=>{
-/**
-         * 创建线条模型
-         */
-				 var geometry = new THREE.BufferGeometry(); //创建一个缓冲类型几何体
-        // 三维样条曲线
-        var curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(10, 0, -10),
-            new THREE.Vector3(0, 8, 0),
-            // new THREE.Vector3(0, 80, 90),
-            new THREE.Vector3(-10, 0, 10),
-        ]);
-        //曲线上等间距返回多个顶点坐标
-        var points = curve.getSpacedPoints(100); //分段数100，返回101个顶点
-        // setFromPoints方法从points中提取数据赋值给attributes.position
-        geometry.setFromPoints(points);
-        var material = new THREE.LineBasicMaterial({
-            color: 0x006666, //轨迹颜色
-        });
-        //线条模型对象
-        var line = new THREE.Line(geometry, material);
-        scene.add(line);
+	const initFlyline1 = ()=>{
 
-        var index = 20; //取点索引位置
-        var num = 10; //从曲线上获取点数量
-        var points2 = points.slice(index, index + num); //从曲线上获取一段
-        var geometry2 = new THREE.BufferGeometry();
-        geometry2.setFromPoints(points2);
+		var vertexShader = document.getElementById('vertex-shader').innerHTML;
+		var fragmentShader = document.getElementById('fragment-shader').innerHTML;
+		// // 预制件
+		// var Prefab = {
+		// 	Sphere: (function() {
+		// 			var instance;
+		// 			return function(clone = true) {
+		// 					if (!instance) {
+		// 							instance = new createSphere();
+		// 					}
+		// 					if (clone) return instance.clone();
+		// 					else return instance;
+		// 			}
+		// 	})()
+		// }
 
+    // 球面随机点
+    for (let i = 0; i < params.pointsLength.length; i++) {
+        addPoints(groupFlyline, params.globeRadius, params.pointsLength[i][0], params.pointsLength[i][1]);
+    }
 
-        // 批量计算所有顶点颜色数据
-        var posNum = points2.length - 2; //分界点黄色，两端和轨迹线一个颜色青色
-        var colorArr = [];
-        for (var i = 0; i < points2.length; i++) {
-            var color1 = new THREE.Color(0x006666); //轨迹线颜色 青色
-            var color2 = new THREE.Color(0xffff00); //黄色
-            var color = null;
-            // 飞线段里面颜色设置为黄色，两侧设置为青色，也就是说中间某个位置向两侧颜色渐变
-            if (i < posNum) {
-                color = color1.lerp(color2, i / posNum)
-            } else {
-                color = color2.lerp(color1, (i - posNum) / (points2.length - posNum))
-            }
-            colorArr.push(color.r, color.g, color.b);
+    // 点到点生成曲线
+    groupFlyline.children.forEach(function(elem, index) {
+        if (elem != groupFlyline.children[0]) {
+            addLines(groupFlyline.children[index - 1].position, elem.position);
         }
-        // 设置几何体顶点颜色数据
-        geometry2.attributes.color = new THREE.BufferAttribute(new Float32Array(colorArr), 3);
+    });
+		console.log('groupFlyline', groupFlyline);
+
+// 		// 3d球面取点
+// function getEarthPos(radius, a, b) {
+//     var x = radius * Math.sin(a) * Math.cos(b);
+//     var y = radius * Math.sin(a) * Math.sin(b);
+//     var z = radius * Math.cos(a);
+//     return {
+//         x, y, z
+//     };
+// }
+
+// 添加随机点
+// function addPoints(group, radius) {
+//     var mesh = new Prefab.Sphere();
+//     var pos = getEarthPos(radius, _PI2 * Math.random(), _PI2 * Math.random());
+//     mesh.position.set(pos.x, pos.y, pos.z);
+//     group.add(mesh);
+// }
+
+function addLines(v0, v3) {
+    var angle = v0.angleTo(v3);
+    var vtop = v0.clone().add(v3);
+    vtop = vtop.normalize().multiplyScalar(params.globeRadius);
+    var n;
+
+    if (angle <= 1) {
+        n = params.globeRadius / 5 * angle;
+    } else if (angle > 1 && angle < 2) {
+        n = params.globeRadius / 5 * Math.pow(angle, 2);
+    } else {
+        n = params.globeRadius / 5 * Math.pow(angle, 1.5);
+    }
+
+    var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
+    var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
 
 
-        var material2 = new THREE.LineBasicMaterial({
-            // color: 0xffff00, //轨迹颜色
-            vertexColors: THREE.VertexColors, //使用顶点颜色，不用设置color
-             linewidth: 3.0, // 设置线宽
-        });
-        //线条模型对象
-        var line2 = new THREE.Line(geometry2, material2);
-        scene.add(line2);
+    // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
+    var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
+    var points = curve.getPoints(500);
+    var geometry = new THREE.BufferGeometry().setFromPoints(points);
 
-		// scene.add(addLines(0,100))
+    let length = points.length;
+    var percents = new Float32Array(length);
+    for (let i = 0; i < length; i += 1) {
+        percents[i] = (i / length);
+    }
+    geometry.setAttribute('percent', new THREE.BufferAttribute(percents, 1));
 
+    var material = createLineMaterial();
+    var flyLine = new THREE.Points(geometry, material);
+    groupFlyline.add(flyLine);
+}
+
+function createLineMaterial() {
+    let uniforms = {
+			time: commonUniforms.time,
+			number: commonUniforms.number,
+			speed: commonUniforms.speed,
+			length: commonUniforms.length,
+			size: commonUniforms.size,
+			color: {
+					value: new THREE.Color(Math.random(), Math.random(), Math.random())
+			}
+    };
+    var material = new THREE.ShaderMaterial({
+				uniforms: uniforms,
+				vertexShader: vertexShader,
+				fragmentShader: fragmentShader,
+				transparent: true,
+				blending: THREE.AdditiveBlending,
+		});
+		return material;
+}
+
+		// // 小球
+		// function createSphere() {
+		// 		var geometry = new THREE.SphereBufferGeometry(0.08);
+		// 		var material = new THREE.MeshBasicMaterial({
+		// 				color: 0x00ffff
+		// 		});
+		// 		var mesh = new THREE.Mesh(geometry, material);
+		// 		return mesh;
+		// }
 	}
 
 	const initRing = ()=>{
 		ringGroup = new THREE.Group()
 
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
-		texLoader.load( '../../model/earth/ring.png', function ( texture ) {
+		texLoader.load( '../../model/earth/ring1.png', function ( texture ) {
 			// const geometry = new THREE.RingGeometry( 12, 15, 100 );
 			var geometry = new THREE.PlaneGeometry( 32.5, 32.5 );
 			var material = new THREE.MeshLambertMaterial( {
@@ -267,7 +464,6 @@
 		} );
 		ringGroup.rotation.set( 1.7, 0.2, 1.5 );
 	}
-
 
 	const initRenderer = ()=>{
     renderer = new THREE.WebGLRenderer( { antialias: true } ); // 创建一个WebGL渲染对象
@@ -333,9 +529,13 @@
 
     earthGroup.add( earth ); // 往3D场景里添加地球模型
     scene.add( colud ); // 云层
+		// earthGroup.add(groupFlyline)
 		earthGroup.add(map); // 地图
 		earthGroup.add(pointwave) // 光点
 		scene.add( ringGroup ); // 星环
+		console.log('groupLines', groupLines);
+		scene.add(groupDots, groupAnimDots);
+		scene.add(groupLines)
 
 		earthGroup.rotation.y = -3.4
 		earthGroup.rotation.x = 0.5
@@ -380,6 +580,23 @@
       earthGroup.rotation.y -= 0.0001;
 			ringGroup.rotation.z += 0.01;
 			colud.rotation.y += 0.0001
+			// commonUniforms.time.value += 0.01
+
+
+		// 	requestAnimationFrame(update);
+    // renderer.render(scene, camera);
+
+    groupAnimDots.children.forEach((elem, index) => {
+        var v = animateDots[index][linetimer.value];
+        elem.position.set(v.x, v.y, v.z);
+    });
+    linetimer.value++;
+    if (linetimer.value > 100) {
+        linetimer.value = 0;
+    }
+
+    // controls.update();
+
       renders()
   }
 

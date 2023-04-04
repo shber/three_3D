@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 11:31:14
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-03 14:24:48
+ * @LastEditTime: 2023-04-04 16:18:40
  * @Description: 
 -->
 <!DOCTYPE html>
@@ -15,39 +15,39 @@
   </head>
   <body>
     <div id="app"></div>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="module" src="/src/main.js"></script>
   </body>
 
-  <script id="vertexShader2" type="x-shader/x-vertex">
-    varying vec2 vUv;
-      attribute float percent;
-      uniform float u_time;
-      uniform float number;
-      uniform float speed;
-      uniform float length;
-      varying float opacity;
-      uniform float size;
-      void main()
-      {
-          vUv = uv;
-          vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-          float l = clamp(1.0-length,0.0,1.0);
-          gl_PointSize = clamp(fract(percent*number + l - u_time*number*speed)-l ,0.0,1.) * size * (1./length);
-          opacity = gl_PointSize/size;
-          gl_Position = projectionMatrix * mvPosition;
-      }
-  </script>
-  <script id="fragmentShader2" type="x-shader/x-vertex">
-    #ifdef GL_ES
-      precision mediump float;
-      #endif
-      varying float opacity;
-      uniform vec3 color;
-      void main(){
-          if(opacity <=0.2){
-              discard;
-          }
-          gl_FragColor = vec4(color,1.0);
-      }
-  </script>
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    attribute float percent;
+    uniform float time;
+    uniform float number;
+    uniform float speed;
+    uniform float length;
+    varying float opacity;
+    uniform float size;
+
+    void main()
+    {
+        float l = clamp(1.0-length, 0.0, 1.0);
+
+        gl_PointSize = clamp(fract(percent*number + l - time*number*speed)-l, 0.0, 1.) * size * (1./length);
+
+        opacity = gl_PointSize/size;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+    varying float opacity;
+    uniform vec3 color;
+
+    void main(){
+        if (opacity <=0.2){
+            discard;
+        }
+        gl_FragColor = vec4(color, 1.0);
+    }
+</script>
 </html>

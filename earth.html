@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  
+    <div id="container" style="width:100vw; height:100vh"></div>
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        attribute float percent;
+        uniform float time;
+        uniform float number;
+        uniform float speed;
+        uniform float length;
+        varying float opacity;
+        uniform float size;
+    
+        void main()
+        {
+            float l = clamp(1.0-length, 0.0, 1.0);
+    
+            gl_PointSize = clamp(fract(percent*number + l - time*number*speed)-l, 0.0, 1.) * size * (1./length);
+    
+            opacity = gl_PointSize/size;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    </script>
+    
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        varying float opacity;
+        uniform vec3 color;
+    
+        void main(){
+            if (opacity <=0.2){
+                discard;
+            }
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three/build/three.module.js';
+
+    var container = document.getElementById('container');
+var scene, camera, renderer;
+var globeMesh = undefined;
+var groupDots, groupLines, groupAnimDots;
+var animateDots = []; // 小球运动点轨迹
+var controls;
+
+// 配置参数
+var params = {
+    pointsLength: 50, // 点数
+    globeRadius: 100 // 地球半径
+}
+
+const PI2 = Math.PI * 2; // 弧度的取值为0-2π
+var timer = 0;
+
+// 预制件
+var Prefab = {
+    Sphere: (function() {
+        var instance;
+        return function(clone = true) {
+            if (!instance) {
+                instance = new createSphere();
+            }
+            if (clone) return instance.clone();
+            else return instance;
+        }
+    })()
+}
+
+init();
+update();
+
+function init() {
+    // 场景
+    scene = new THREE.Scene();
+    groupDots = new THREE.Group();
+    groupLines = new THREE.Group();
+    groupAnimDots = new THREE.Group();
+    scene.add(groupDots, groupLines, groupAnimDots);
+
+    // 相机
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.x = -200;
+    camera.position.y = 200;
+    camera.position.z = -200;
+    camera.lookAt(scene.position);
+
+    // 渲染器
+    renderer = new THREE.WebGLRenderer({
+        antialias: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // 光
+    var light = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
+    scene.add(light);
+
+    // // 控制器
+    // controls = new THREE.OrbitControls(camera, renderer.domElement);
+    // controls.minDistance = 200;
+    // controls.maxDistance = 400;
+    // controls.rotateSpeed = 0.5;
+    // controls.enableDamping = true;
+    // controls.enablePan = false;
+
+    initGlobe();
+    initLines();
+
+    window.addEventListener('resize', onWindowResize, false);
+}
+
+function update() {
+    requestAnimationFrame(update);
+    renderer.render(scene, camera);
+
+    groupAnimDots.children.forEach((elem, index) => {
+        var v = animateDots[index][timer];
+        elem.position.set(v.x, v.y, v.z);
+    });
+    timer++;
+    if (timer > 100) {
+        timer = 0;
+    }
+
+    // controls.update();
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function initGlobe() {
+    // 地球
+    var geo = new THREE.SphereGeometry(params.globeRadius, 32, 32);
+    var texture = new THREE.TextureLoader().load('./public/model/earth/earth1.jpg');
+    texture.minFilter = THREE.LinearFilter;
+    var material = new THREE.MeshPhongMaterial({
+        map: texture,
+        // wireframe: true
+    });
+
+    globeMesh = new THREE.Mesh(geo, material);
+    scene.add(globeMesh);
+}
+
+// 地球飞线和点
+function initLines() {
+    // 球面随机点
+    for (let i = 0; i < params.pointsLength; i++) {
+        addPoints(groupDots, params.globeRadius);
+    }
+
+    // 曲线
+    groupDots.children.forEach(function(elem) {
+        // 从第一个点到其它点
+        if (elem != groupDots.children[0]) {
+            var line = addLines(groupDots.children[0].position, elem.position);
+            animateDots.push(line.curve.getPoints(100));
+        }
+    });
+
+    // 小球动画
+    for (let i = 0; i < animateDots.length; i++) {
+        var mesh = new Prefab.Sphere();
+        mesh.material = new THREE.MeshBasicMaterial({
+            color: 0xffff00
+        });
+        mesh.material.needsUpdate = true;
+        groupAnimDots.add(mesh);
+    }
+}
+
+// 3d球面取点
+function getEarthPos(radius, a, b) {
+    var x = radius * Math.sin(a) * Math.cos(b);
+    var y = radius * Math.sin(a) * Math.sin(b);
+    var z = radius * Math.cos(a);
+    return {
+        x, y, z
+    };
+}
+
+
+// 添加随机点
+function addPoints(group, radius) {
+    var mesh = new Prefab.Sphere();
+    var pos = getEarthPos(radius, PI2 * Math.random(), PI2 * Math.random());
+    mesh.position.set(pos.x, pos.y, pos.z);
+    group.add(mesh);
+}
+
+function addLines(v0, v3) {
+    var angle = v0.angleTo(v3);
+
+    var vtop = v0.clone().add(v3);
+    vtop = vtop.normalize().multiplyScalar(params.globeRadius);
+
+    var n;
+
+    if (angle <= 1) {
+        n = params.globeRadius / 5 * angle;
+    } else if (angle > 1 && angle < 2) {
+        n = params.globeRadius / 5 * Math.pow(angle, 2);
+    } else {
+        n = params.globeRadius / 5 * Math.pow(angle, 1.5);
+    }
+
+    var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
+    var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
+
+
+    // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
+    var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
+    var geometry = new THREE.BufferGeometry();
+    geometry.vertices = curve.getPoints(50);
+    var material = new THREE.LineBasicMaterial({
+        color: 0xff0000
+    });
+    var lineMesh = new THREE.Line(geometry, material)
+    groupLines.add(lineMesh);
+
+    return {
+        curve: curve,
+        lineMesh: lineMesh
+    };
+}
+
+function createSphere() {
+    var geometry = new THREE.SphereBufferGeometry(1);
+    var material = new THREE.MeshBasicMaterial({
+        color: 0x00ffff
+    });
+    var mesh = new THREE.Mesh(geometry, material);
+    return mesh;
+}
+
+function addPointHelper(pos) {
+    var mesh = new Prefab.Sphere();
+    mesh.material = new THREE.MeshBasicMaterial({
+        color: 0xff0000
+    });
+    mesh.position.copy(pos);
+    scene.add(mesh);
+}
+
+function addLineHelper(pos1, pos2) {
+    var material = new THREE.LineBasicMaterial({
+        color: 0x0000ff
+    });
+
+    var geometry = new THREE.Geometry();
+    geometry.vertices.push(pos1, pos2);
+    var line = new THREE.Line(geometry, material);
+    scene.add(line);
+}
+
+  </script>
+</body>
+</html>
