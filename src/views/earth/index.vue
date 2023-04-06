@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-06 18:07:33
+ * @LastEditTime: 2023-04-06 18:13:14
  * @Description: 
 -->
 <template>
@@ -11,7 +11,7 @@
 	</div>
 </template>
 <script setup>
-	import { reactive, ref , onMounted, onBeforeMount } from 'vue'
+	import { reactive, ref , onMounted, onBeforeMount, onUnmounted } from 'vue'
 	import { lglt2xyz, Prefab, getEarthPos } from '@/utils/index.js'
 	import  * as THREE  from 'three';
 	import * as TWEEN from '@tweenjs/tween.js'
@@ -70,6 +70,9 @@
 
     window.addEventListener('resize', onWindowResize, false);
 
+	})
+	onUnmounted(()=>{ // 页面销毁 清除动画
+		cancelAnimationFrame(timer)
 	})
 
 	const initScene = () =>{
