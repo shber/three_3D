@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-06 17:48:31
+ * @LastEditTime: 2023-04-06 18:07:33
  * @Description: 
 -->
 <template>
@@ -127,7 +127,7 @@
 			} );
 			map.add( province );
 		} );
-		map.scale.set(10,10,10)
+		map.scale.set(globeRadius, globeRadius, globeRadius)
 	}
 
 	const linetimer = ref(0);
@@ -407,6 +407,6 @@
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-}
+	}
 
 </script>
