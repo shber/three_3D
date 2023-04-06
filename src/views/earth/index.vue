@@ -2,27 +2,28 @@
  * @Author: Shber
  * @Date: 2023-03-27 18:13:53
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-04 17:32:48
+ * @LastEditTime: 2023-04-06 17:48:31
  * @Description: 
 -->
 <template>
-	<div class="canvas" id="earth"></div>
+	<div class="canvas" id="earth">
+		<Tip/>
+	</div>
 </template>
 <script setup>
-	import { reactive, ref , onMounted } from 'vue'
-	// import { addPoints } from '@/utils/index.js'
+	import { reactive, ref , onMounted, onBeforeMount } from 'vue'
+	import { lglt2xyz, Prefab, getEarthPos } from '@/utils/index.js'
 	import  * as THREE  from 'three';
 	import * as TWEEN from '@tweenjs/tween.js'
   // 引入轨道控制器扩展库OrbitControls.js 配置addons/等价于examples/jsm/。
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-	import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 	import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 	import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
   //引入性能监视器stats.js
   import Stats from 'three/addons/libs/stats.module.js';
   import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 	import * as chinaMap from '../../../public/model/earth/china.json'
+	import Tip from '@/components/Tip.vue'
 
 	const stats = new Stats();
 	document.body.appendChild(stats.domElement);
@@ -37,62 +38,38 @@
 	let earthGroup = reactive({}) // 地球模型组
 	let earth = reactive({}) // 地球
 	let colud = reactive({}) // 云层
-	let map = reactive() // 中国地图
+	let map = reactive({}) // 中国地图
 	let pointwave = reactive({}) // 光点涟漪
 	let ringGroup = reactive({}) // 星环
-	let flyline = reactive({}) // 飞线
-	let groupFlyline = reactive({})
-
-	var groupDots = reactive() 
-	var groupLines = reactive()
-	var groupAnimDots = reactive();
+	var groupDots = reactive({})  // 飞线 随机小球
+	var groupLines = reactive({}) // 飞线
+	var groupAnimDots = reactive({}); // 飞线动画小球
 	var animateDots = reactive([]); // 小球运动点轨迹
 
 
-	// let commonUniforms = reactive({
-	// 	time: { value: 0 },
-	// 	number: { value: 1 },
-	// 	speed: { value: 0.5 },
-	// 	length: { value: 0.6 }, // 飞线长度
-	// 	size: { value: 2.5 } // 飞线宽度
-	// });
-	// // 配置参数
-	// var params = {
-	// 	globeRadius: 10, // 地球半径
-	// 	pointsLength: [
-	// 		[116.405285, 39.904989],
-	// 		[121.472644, 31.231706],
-	// 		[113.280637, 23.125178],
-	// 		[104.065735, 30.659462]
-	// 	], // 点数
-	// }
-	// var _PI2 = Math.PI * 2; // 弧度的取值为0-2π
+	let timer = null
+	const globeRadius = 10; // 地球半径
+	onBeforeMount(()=>{
 
-
-
-	let timer = reactive()
-
+	})
 	onMounted(()=>{
-    console.log(THREE);
-		groupFlyline = new THREE.Group(); // flyline
-		groupDots = new THREE.Group();
-    groupAnimDots = new THREE.Group();
 		initScene() // 创建3D场景
     initCamera() // 创建相机
     initLight() // 创建光照效果
 		initRing() // 星环
 		initFlyline() // 飞线
+		initCasque() // 头盔彩蛋
 		// initPointwave()
 		initChinaMap(chinaMap) // 地图轮廓
-
     initRenderer() // 开始合成
     initModel() // 创建模型，例如长方体，球体等
-		// initBeam()
 		initBackground()
     initMesh() // 创建网格模型
-		initCasque()
     initControls() // 添加控制器
 		intoAnimation() // 添加进场动画
+
+    window.addEventListener('resize', onWindowResize, false);
+
 	})
 
 	const initScene = () =>{
@@ -101,7 +78,7 @@
 	}
 	const initCamera = ()=>{
 		camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 ); 
-		camera.position.set(0, 0, 101); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
+		camera.position.set(0, 0, 280); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
     camera.lookAt(0, 0, 0); //坐标原点
     scene.add(camera); // 将相机添加到场景中
 	}
@@ -128,12 +105,6 @@
 
 
 	const initChinaMap = (chinaJson )=>{
-		const lglt2xyz =(lng, lat, radius)=> {
-			const theta = (90 + lng) * (Math.PI / 180)
-			const phi = (90 - lat) * (Math.PI / 180)
-			return (new THREE.Vector3()).setFromSpherical(new THREE.Spherical(radius, phi, theta))
-		}
-
 		map = new THREE.Group()
 		// 遍历省份构建模型
 		chinaJson.features.forEach( elem => {
@@ -157,125 +128,77 @@
 			map.add( province );
 		} );
 		map.scale.set(10,10,10)
-
-
 	}
 
-	const  linetimer = ref(0);
+	const linetimer = ref(0);
 	const initFlyline = ()=>{
-// 地球飞线和点
-// 配置参数
-var params = {
-    pointsLength: 50, // 点数
-    globeRadius: 10 // 地球半径
-}
+			groupDots = new THREE.Group();
+			groupLines = new THREE.Group();
+			groupAnimDots = new THREE.Group();
+			const pointsLength = 20; // 点数
+			const PI2 = Math.PI * 2; // 弧度的取值为0-2π
 
-const PI2 = Math.PI * 2; // 弧度的取值为0-2π
+    	// 球面随机点
+			for (let i = 0; i < pointsLength; i++) {
+					addPoints(groupDots, globeRadius);
+			}
 
-// 预制件
-var Prefab = {
-    Sphere: (function() {
-        var instance;
-        return function(clone = true) {
-            if (!instance) {
-                instance = new createSphere();
-            }
-            if (clone) return instance.clone();
-            else return instance;
-        }
-    })()
-}
-// 地球飞线和点
+			// 曲线
+			groupDots.children.forEach(function(elem) {
+					// 从第一个点到其它点
+					var firstPoint = lglt2xyz( 116.405285, 39.904989, globeRadius); // 北京坐标， china.json文件里有
+					if (elem != groupDots.children[0]) {
+							var line = addLines(firstPoint, elem.position);
+							animateDots.push(line.curve.getPoints(100));
+					}
+			});
 
-    // 球面随机点
-    for (let i = 0; i < params.pointsLength; i++) {
-        addPoints(groupDots, params.globeRadius);
-    }
+			// 小球动画
+			for (let i = 0; i < animateDots.length; i++) {
+					var mesh = new Prefab.Sphere();
+					mesh.material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+					mesh.material.needsUpdate = true;
+					groupAnimDots.add(mesh);
+			}
 
-    // 曲线
-    groupDots.children.forEach(function(elem) {
-        // 从第一个点到其它点
-        if (elem != groupDots.children[0]) {
-            var line = addLines(groupDots.children[0].position, elem.position);
-            animateDots.push(line.curve.getPoints(100));
-        }
-    });
+			// 添加随机点
+			function addPoints(group, radius) {
+					var mesh = new Prefab.Sphere();
+					var pos = getEarthPos(radius, PI2 * Math.random(), PI2 * Math.random());
+					mesh.position.set(pos.x, pos.y, pos.z);
+					group.add(mesh);
+			}
 
-    // 小球动画
-    for (let i = 0; i < animateDots.length; i++) {
-        var mesh = new Prefab.Sphere();
-        mesh.material = new THREE.MeshBasicMaterial({
-            color: 0xffff00
-        });
-        mesh.material.needsUpdate = true;
-        groupAnimDots.add(mesh);
-    }
+			function addLines(v0, v3) {
+					var angle = v0.angleTo(v3);
+					var vtop = v0.clone().add(v3);
+					vtop = vtop.normalize().multiplyScalar(globeRadius);
+					var n;
 
+					if (angle <= 1) {
+							n = globeRadius / 5 * angle;
+					} else if (angle > 1 && angle < 2) {
+							n = globeRadius / 5 * Math.pow(angle, 2);
+					} else {
+							n = globeRadius / 5 * Math.pow(angle, 1.5);
+					}
 
-// 3d球面取点
-function getEarthPos(radius, a, b) {
-    var x = radius * Math.sin(a) * Math.cos(b);
-    var y = radius * Math.sin(a) * Math.sin(b);
-    var z = radius * Math.cos(a);
-    return {
-        x, y, z
-    };
-}
+					var v1 = v0.clone().add(vtop).normalize().multiplyScalar(globeRadius + n);
+					var v2 = v3.clone().add(vtop).normalize().multiplyScalar(globeRadius + n);
+					// 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
+					var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
+					var geometry = new THREE.BufferGeometry();
+					let curveArr = curve.getPoints(50); // 返回定义曲线路径的一组点
+					const vertices = curveArr.map(({ x, y, z }) => [x, y, z]).flat(); // 把数组对象转为一维数组
 
+					geometry.setAttribute( 'position', new THREE.BufferAttribute(new Float32Array(vertices), 3) );
 
-// 添加随机点
-function addPoints(group, radius) {
-    var mesh = new Prefab.Sphere();
-    var pos = getEarthPos(radius, PI2 * Math.random(), PI2 * Math.random());
-    mesh.position.set(pos.x, pos.y, pos.z);
-    group.add(mesh);
-}
+					var material = new THREE.LineBasicMaterial({ color: 0x00ffff });
+					var lineMesh = new THREE.Line(geometry, material)
+					groupLines.add(lineMesh);
 
-function addLines(v0, v3) {
-	groupLines = new THREE.Group();
-    var angle = v0.angleTo(v3);
-
-    var vtop = v0.clone().add(v3);
-    vtop = vtop.normalize().multiplyScalar(params.globeRadius);
-
-    var n;
-
-    if (angle <= 1) {
-        n = params.globeRadius / 5 * angle;
-    } else if (angle > 1 && angle < 2) {
-        n = params.globeRadius / 5 * Math.pow(angle, 2);
-    } else {
-        n = params.globeRadius / 5 * Math.pow(angle, 1.5);
-    }
-
-    var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
-    var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
-
-
-    // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
-    var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
-    var geometry = new THREE.BufferGeometry();
-    geometry.vertices = curve.getPoints(50);
-    var material = new THREE.LineBasicMaterial({
-        color: 0xff0000
-    });
-    var lineMesh = new THREE.Line(geometry, material)
-    groupLines.add(lineMesh);
-
-    return {
-        curve: curve,
-        lineMesh: lineMesh
-    };
-}
-
-function createSphere() {
-    var geometry = new THREE.SphereBufferGeometry(0.07);
-    var material = new THREE.MeshBasicMaterial({
-        color: 0x00ffff
-    });
-    var mesh = new THREE.Mesh(geometry, material);
-    return mesh;
-}
+					return { curve: curve, lineMesh: lineMesh };
+			}
 	}
 
 	const initPointwave = (WaveMeshArr)=>{
@@ -314,121 +237,6 @@ function createSphere() {
 		// pointwave.rotation.set(20, 20, 20)
 	
 	}
-	const initFlyline1 = ()=>{
-
-		var vertexShader = document.getElementById('vertex-shader').innerHTML;
-		var fragmentShader = document.getElementById('fragment-shader').innerHTML;
-		// // 预制件
-		// var Prefab = {
-		// 	Sphere: (function() {
-		// 			var instance;
-		// 			return function(clone = true) {
-		// 					if (!instance) {
-		// 							instance = new createSphere();
-		// 					}
-		// 					if (clone) return instance.clone();
-		// 					else return instance;
-		// 			}
-		// 	})()
-		// }
-
-    // 球面随机点
-    for (let i = 0; i < params.pointsLength.length; i++) {
-        addPoints(groupFlyline, params.globeRadius, params.pointsLength[i][0], params.pointsLength[i][1]);
-    }
-
-    // 点到点生成曲线
-    groupFlyline.children.forEach(function(elem, index) {
-        if (elem != groupFlyline.children[0]) {
-            addLines(groupFlyline.children[index - 1].position, elem.position);
-        }
-    });
-		console.log('groupFlyline', groupFlyline);
-
-// 		// 3d球面取点
-// function getEarthPos(radius, a, b) {
-//     var x = radius * Math.sin(a) * Math.cos(b);
-//     var y = radius * Math.sin(a) * Math.sin(b);
-//     var z = radius * Math.cos(a);
-//     return {
-//         x, y, z
-//     };
-// }
-
-// 添加随机点
-// function addPoints(group, radius) {
-//     var mesh = new Prefab.Sphere();
-//     var pos = getEarthPos(radius, _PI2 * Math.random(), _PI2 * Math.random());
-//     mesh.position.set(pos.x, pos.y, pos.z);
-//     group.add(mesh);
-// }
-
-function addLines(v0, v3) {
-    var angle = v0.angleTo(v3);
-    var vtop = v0.clone().add(v3);
-    vtop = vtop.normalize().multiplyScalar(params.globeRadius);
-    var n;
-
-    if (angle <= 1) {
-        n = params.globeRadius / 5 * angle;
-    } else if (angle > 1 && angle < 2) {
-        n = params.globeRadius / 5 * Math.pow(angle, 2);
-    } else {
-        n = params.globeRadius / 5 * Math.pow(angle, 1.5);
-    }
-
-    var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
-    var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
-
-
-    // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
-    var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
-    var points = curve.getPoints(500);
-    var geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-    let length = points.length;
-    var percents = new Float32Array(length);
-    for (let i = 0; i < length; i += 1) {
-        percents[i] = (i / length);
-    }
-    geometry.setAttribute('percent', new THREE.BufferAttribute(percents, 1));
-
-    var material = createLineMaterial();
-    var flyLine = new THREE.Points(geometry, material);
-    groupFlyline.add(flyLine);
-}
-
-function createLineMaterial() {
-    let uniforms = {
-			time: commonUniforms.time,
-			number: commonUniforms.number,
-			speed: commonUniforms.speed,
-			length: commonUniforms.length,
-			size: commonUniforms.size,
-			color: {
-					value: new THREE.Color(Math.random(), Math.random(), Math.random())
-			}
-    };
-    var material = new THREE.ShaderMaterial({
-				uniforms: uniforms,
-				vertexShader: vertexShader,
-				fragmentShader: fragmentShader,
-				transparent: true,
-				blending: THREE.AdditiveBlending,
-		});
-		return material;
-}
-
-		// // 小球
-		// function createSphere() {
-		// 		var geometry = new THREE.SphereBufferGeometry(0.08);
-		// 		var material = new THREE.MeshBasicMaterial({
-		// 				color: 0x00ffff
-		// 		});
-		// 		var mesh = new THREE.Mesh(geometry, material);
-		// 		return mesh;
-		// }
-	}
 
 	const initRing = ()=>{
 		ringGroup = new THREE.Group()
@@ -436,7 +244,7 @@ function createLineMaterial() {
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
 		texLoader.load( '../../model/earth/ring1.png', function ( texture ) {
 			// const geometry = new THREE.RingGeometry( 12, 15, 100 );
-			var geometry = new THREE.PlaneGeometry( 32.5, 32.5 );
+			var geometry = new THREE.PlaneGeometry( 30, 30 );
 			var material = new THREE.MeshLambertMaterial( {
 				color: 0xffffff,
 				map: texture, 
@@ -450,7 +258,7 @@ function createLineMaterial() {
 		});
 
 		texLoader.load( '../../model/earth/moon.png', function ( texture ) {
-			var moon = new THREE.Vector3( 12.01, 0, 0 );
+			var moon = new THREE.Vector3( globeRadius+ 4.2, 0, 0 );
 			const geometry = new THREE.BufferGeometry().setFromPoints( [moon] );
 			var material = new THREE.PointsMaterial( {
 				map: texture,
@@ -468,7 +276,6 @@ function createLineMaterial() {
 	const initRenderer = ()=>{
     renderer = new THREE.WebGLRenderer( { antialias: true } ); // 创建一个WebGL渲染对象
     renderer.setSize( window.innerWidth, window.innerHeight ); // 设置渲染区域尺寸
-
     // renderer.setAnimationLoop( animation ); // 执行动画循环 帧率不会锁60
 		renders()
     document.getElementById("earth").appendChild( renderer.domElement );
@@ -511,8 +318,8 @@ function createLineMaterial() {
 	}
 
 	const initModel = ()=>{
-    let earthGeometry = new THREE.SphereGeometry(10, 100, 100); // 地球模型
-		let cloudGeometry = new THREE.SphereGeometry(10.1, 100, 100); // 云模型		
+    let earthGeometry = new THREE.SphereGeometry(globeRadius, 100, 100); // 地球模型
+		let cloudGeometry = new THREE.SphereGeometry(globeRadius+0.1, 100, 100); // 云模型比地球模型稍微大一点，大气层效果		
 
 		const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
 		let texture = texLoader.load( '../../model/earth/earth3.png'); // 地球贴图
@@ -528,18 +335,15 @@ function createLineMaterial() {
 		earthGroup = new THREE.Group(); 
 
     earthGroup.add( earth ); // 往3D场景里添加地球模型
-    scene.add( colud ); // 云层
-		// earthGroup.add(groupFlyline)
 		earthGroup.add(map); // 地图
 		earthGroup.add(pointwave) // 光点
-		scene.add( ringGroup ); // 星环
-		console.log('groupLines', groupLines);
-		scene.add(groupDots, groupAnimDots);
-		scene.add(groupLines)
+		earthGroup.add(groupDots, groupLines, groupAnimDots); // 飞线小球， 飞线， 飞线轨迹小球
 
-		earthGroup.rotation.y = -3.4
+		earthGroup.rotation.y = -3.4 // 矫正一下位置，让中国首先展示
 		earthGroup.rotation.x = 0.5
 		scene.add(earthGroup)
+		scene.add( colud ); // 云层
+		scene.add( ringGroup ); // 星环
   }
 
 	const initCasque = ()=>{ // 彩蛋，头盔模型
@@ -563,9 +367,10 @@ function createLineMaterial() {
       controls.addEventListener('change', function (e) { //监听事件
         renders()
       });
-			controls.enableDamping = true 
+			controls.enableDamping = true; // 增加阻尼
 			controls.minDistance = 0.1;
 			controls.maxDistance = 100;
+			// controls.rotateSpeed = 0.5;
       // controls.enableZoom = false
   }
 	const renders = ()=> { // 执行渲染操作
@@ -580,32 +385,28 @@ function createLineMaterial() {
       earthGroup.rotation.y -= 0.0001;
 			ringGroup.rotation.z += 0.01;
 			colud.rotation.y += 0.0001
-			// commonUniforms.time.value += 0.01
 
-
-		// 	requestAnimationFrame(update);
-    // renderer.render(scene, camera);
-
-    groupAnimDots.children.forEach((elem, index) => {
-        var v = animateDots[index][linetimer.value];
-        elem.position.set(v.x, v.y, v.z);
-    });
-    linetimer.value++;
-    if (linetimer.value > 100) {
-        linetimer.value = 0;
-    }
-
-    // controls.update();
+			groupAnimDots.children.forEach((elem, index) => { // 飞线轨迹小球动画
+					var v = animateDots[index][linetimer.value];
+					elem.position.set(v.x, v.y, v.z);
+			});
+			linetimer.value++;
+			if (linetimer.value > 100) {
+					linetimer.value = 0;
+			}
 
       renders()
   }
 
 	const intoAnimation = ()=>{
-		let tween = new TWEEN.Tween(camera.position).to({x: 0, y: 0, z:20}, 4000)
+		let tween = new TWEEN.Tween(camera.position).to({x: 0, y: 0, z:22}, 4000)
       	tween.start()
 	}
 
-
-
+	const onWindowResize = ()=>{
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
 </script>

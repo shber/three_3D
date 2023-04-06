@@ -52,7 +52,7 @@ var controls;
 
 // 配置参数
 var params = {
-    pointsLength: 50, // 点数
+    pointsLength: 100, // 点数
     globeRadius: 100 // 地球半径
 }
 
@@ -79,6 +79,8 @@ update();
 function init() {
     // 场景
     scene = new THREE.Scene();
+		scene.background = new THREE.Color(0xffffff); // 设置场景背景颜色
+
     groupDots = new THREE.Group();
     groupLines = new THREE.Group();
     groupAnimDots = new THREE.Group();
@@ -101,9 +103,9 @@ function init() {
 
     // 光
     var light = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
-    scene.add(light);
+    // scene.add(light);
 
-    // // 控制器
+    // 控制器
     // controls = new THREE.OrbitControls(camera, renderer.domElement);
     // controls.minDistance = 200;
     // controls.maxDistance = 400;
@@ -143,7 +145,7 @@ function onWindowResize() {
 function initGlobe() {
     // 地球
     var geo = new THREE.SphereGeometry(params.globeRadius, 32, 32);
-    var texture = new THREE.TextureLoader().load('./public/model/earth/earth1.jpg');
+    var texture = new THREE.TextureLoader().load('/uploads/user_upload/56822/earth.jpg');
     texture.minFilter = THREE.LinearFilter;
     var material = new THREE.MeshPhongMaterial({
         map: texture,
@@ -174,7 +176,7 @@ function initLines() {
     for (let i = 0; i < animateDots.length; i++) {
         var mesh = new Prefab.Sphere();
         mesh.material = new THREE.MeshBasicMaterial({
-            color: 0xffff00
+            color: 0xff6600
         });
         mesh.material.needsUpdate = true;
         groupAnimDots.add(mesh);
@@ -219,13 +221,16 @@ function addLines(v0, v3) {
     var v1 = v0.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
     var v2 = v3.clone().add(vtop).normalize().multiplyScalar(params.globeRadius + n);
 
+    // addLineHelper(globeMesh.position, v1);
+    // addLineHelper(globeMesh.position, v2);
+    // addLineHelper(globeMesh.position, vtop)
 
     // 三维三次贝塞尔曲线（v0起点，v1第一个控制点，v2第二个控制点，v3终点）
     var curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
     var geometry = new THREE.BufferGeometry();
     geometry.vertices = curve.getPoints(50);
     var material = new THREE.LineBasicMaterial({
-        color: 0xff0000
+        color: 0xff6600
     });
     var lineMesh = new THREE.Line(geometry, material)
     groupLines.add(lineMesh);
@@ -259,11 +264,13 @@ function addLineHelper(pos1, pos2) {
         color: 0x0000ff
     });
 
-    var geometry = new THREE.Geometry();
+    var geometry = new THREE.BufferGeometry();
     geometry.vertices.push(pos1, pos2);
     var line = new THREE.Line(geometry, material);
     scene.add(line);
 }
+
+
 
   </script>
 </body>
