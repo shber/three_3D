@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-06 16:40:09
+ * @LastEditTime: 2023-04-10 14:06:35
  * @Description: 
 -->
 <template>
@@ -42,6 +42,7 @@
     initRenderer() // 开始合成
     initModel() // 创建模型，例如长方体，球体等
     initMesh() // 创建网格模型
+    initTag()
     initControls() // 添加控制器
     // initGui() // 
 
@@ -56,6 +57,10 @@
         // 如果相机的一些属性发生了变化，需要执行updateProjectionMatrix ()方法更新相机的投影矩阵
         camera.updateProjectionMatrix();
     };
+
+    window.onmousemove  = function(e){
+      // console.log(e);
+    }
 
   })
 
@@ -87,6 +92,7 @@
   let mesh = reactive({})
   let geometry = reactive({})
   let materials = reactive([]) //材质包
+  let tag = reactive({})
   let controls = reactive({})
   let gui = reactive({}) // 全局控制
 
@@ -113,9 +119,9 @@
   }
 
   const initCamera = ()=>{ // 创建相机
-    camera = new THREE.PerspectiveCamera( 80, window.innerWidth / window.innerHeight, 1, 10000 ); 
-    camera.position.set(0, 0, 1); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
-    camera.lookAt(0, 0, 0); //坐标原点
+    camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 0.1, 1000 ); 
+    camera.position.set(0, 0, -100); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
+    // camera.lookAt(0, 0, 0); //坐标原点
     scene.add(camera); // 将相机添加到场景中
   } 
 
@@ -123,6 +129,23 @@
     light = new THREE.PointLight(0xffffff, 1); // 设置点光源，有多种光源类型
     light.position.set(10, 0, 100);//点光源放在x轴上
     scene.add(light); //点光源添加到场景中
+  }
+
+  const initTag = ()=>{
+    var geometry = new THREE.PlaneGeometry( 1, 1 );
+    const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
+		let texture = texLoader.load( '../../model/earth/ring.png')
+    var material = new THREE.MeshLambertMaterial( {
+      color: 0xffffff,
+      map: texture, 
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide, 
+      depthWrite: false
+    });
+    tag = new THREE.Mesh( geometry, material );
+    // tag.position.set(0, 0, 10)
+    scene.add(tag); //点光源添加到场景中
   }
 
   const initRenderer = ()=>{
@@ -144,6 +167,7 @@
       let texture = texLoader.load( item.url );
       materials.push(new THREE.MeshBasicMaterial({ map: texture, side:THREE.DoubleSide })); // 添加到材质包
     })  
+    // geometry.scale(20, 20, -20);
   }
 
   const initMesh = ()=> {
@@ -154,21 +178,27 @@
   const initControls = ()=>{
       controls = new OrbitControls(camera, renderer.domElement);
       controls.addEventListener('change', function (e) { //监听事件
-        renderer.render(scene, camera); //执行渲染操作
+        render()
       });
-      controls.minDistance = 1;
-			controls.maxDistance = 3;
+      // controls.minDistance = 1;
+			// controls.maxDistance = 3;
       // controls.enableZoom = false
+      controls.enableRotate = true;
+      controls.enablePan = false;
+      controls.enableDamping = true;
   }
 
   const removeScene = ()=>{
     scene.remove(mesh);
   }
-
+  // 
+  const render = ()=>{
+    renderer.render( scene, camera ); // 执行渲染操作
+  }
   const animation = ( time )=> {
       // mesh.rotation.x = time / 2000;
-      mesh.rotation.y = time / 30000;
-      renderer.render( scene, camera ); // 执行渲染操作
+      // mesh.rotation.y = time / 30000;
+      render()
   }
   const initGui = ()=> {
     gui = new GUI();
