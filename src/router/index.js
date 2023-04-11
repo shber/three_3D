@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-27 11:41:55
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-10 16:58:48
+ * @LastEditTime: 2023-04-11 11:26:18
  * @Description: 
  */
 import {createRouter, createWebHistory} from 'vue-router';
@@ -22,6 +22,11 @@ const routes = [
     path: '/aero',
     name: 'aero',
     component: () => import('@/views/airtransport/index.vue'),
+  },
+  {
+    path: '/palace',
+    name: 'palace',
+    component: () => import('@/views/palace/index.vue')
   },
   {
     path: '/demo',

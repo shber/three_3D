@@ -2,7 +2,7 @@
  * @Author: Shber
  * @Date: 2023-03-25 14:44:04
  * @LastEditors: Shber
- * @LastEditTime: 2023-04-10 14:06:35
+ * @LastEditTime: 2023-04-11 12:04:07
  * @Description: 
 -->
 <template>
@@ -119,8 +119,8 @@
   }
 
   const initCamera = ()=>{ // 创建相机
-    camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 0.1, 1000 ); 
-    camera.position.set(0, 0, -100); // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
+    camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerHeight, 0.1, 100 ); 
+    camera.position.z = 0.01; // 设置相机位置，原理就像在房子不同的位置拍照出现的画面效果也不同，参数分别是 x轴，y轴，和z轴
     // camera.lookAt(0, 0, 0); //坐标原点
     scene.add(camera); // 将相机添加到场景中
   } 
@@ -150,24 +150,21 @@
 
   const initRenderer = ()=>{
     renderer = new THREE.WebGLRenderer( { antialias: true } ); // 创建一个WebGL渲染对象
-    // renderer.setClearColor(0x444444, 1); //设置背景颜色
+    renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight ); // 设置渲染区域尺寸
     renderer.setAnimationLoop( animation ); // 执行动画循环
-    // document.body.appendChild( renderer.domElement ); // domElement 本质上就是一个HTML元素：Canvas画布
     document.getElementById("house").appendChild( renderer.domElement );
   }
 
   const initModel = ()=>{
-    geometry = new THREE.BoxGeometry( 20, 25, 20 ); // 创建模型，长方形（正方形也属于长方形）模型
-    // let picList = ["右", "后", "上", "下", "左", "正" ];
+    geometry = new THREE.BoxGeometry( 1, 1, 1 ); // 创建模型，长方形（正方形也属于长方形）模型
     let picList = modelData[modelName.value];
     const texLoader = new THREE.TextureLoader(); // 创建纹理贴图的加载器
     picList.forEach(item=>{ // 把6张贴图贴到长方体的六个面
-      // let texture = texLoader.load( `/model/house/${item}.png` );
       let texture = texLoader.load( item.url );
-      materials.push(new THREE.MeshBasicMaterial({ map: texture, side:THREE.DoubleSide })); // 添加到材质包
+      materials.push(new THREE.MeshBasicMaterial({ map: texture })); // 添加到材质包
     })  
-    // geometry.scale(20, 20, -20);
+    geometry.scale(1, 1, -1);
   }
 
   const initMesh = ()=> {
@@ -183,7 +180,7 @@
       // controls.minDistance = 1;
 			// controls.maxDistance = 3;
       // controls.enableZoom = false
-      controls.enableRotate = true;
+      // controls.enableRotate = true;
       controls.enablePan = false;
       controls.enableDamping = true;
   }
